@@ -1,17 +1,15 @@
-import {token} from 'token.js';
+const {token, proxy} = require('./config.js');
+const isHeroku = process.env.ISHEROKU === '1';
 
 const TelegramBot = require('node-telegram-bot-api');
-
+console.log(token);
 // Create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(
-    token,
+    token || process.env.TOKEN,
     {
         polling: true,
         request: {
-            // Proxy settings here
-            // proxy: 'http://82.119.170.106:8080',
-            proxy: 'http://134.119.179.194:5836',
-            strictSSL: false,
+            ...isHeroku ? {} : proxy,
         },
     },
 );
@@ -33,9 +31,10 @@ bot.onText(/\/echo (.+)/, (msg, match) => {
 // messages.
 bot.on('message', (msg) => {
     const chatId = msg.chat.id;
-
+    const firstName = msg.chat.first_name;
+    console.log(msg);
     // send a message to the chat acknowledging receipt of their message
-    bot.sendMessage(chatId, `Received your message. ChatId is ${chatId}`);
+    bot.sendMessage(chatId, `Received your message. Hello ${firstName}`);
 });
 
 // bot.on("polling_error", console.log);
