@@ -1,15 +1,15 @@
-const {token, proxy} = require('./config.js');
 const isHeroku = process.env.ISHEROKU === '1';
+const {token = process.env.TOKEN, proxy = {}} = isHeroku ? {} : require('./config.js')
 
 const TelegramBot = require('node-telegram-bot-api');
-console.log(token);
+
 // Create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(
-    token || process.env.TOKEN,
+    token,
     {
         polling: true,
         request: {
-            ...isHeroku ? {} : proxy,
+            ...proxy,
         },
     },
 );
@@ -34,7 +34,7 @@ bot.on('message', (msg) => {
     const firstName = msg.chat.first_name;
     console.log(msg);
     // send a message to the chat acknowledging receipt of their message
-    bot.sendMessage(chatId, `Received your message. Hello ${firstName}`);
+    bot.sendMessage(chatId, `Hello ${firstName}! Received your message. It's "${msg.text}"`);
 });
 
 // bot.on("polling_error", console.log);
