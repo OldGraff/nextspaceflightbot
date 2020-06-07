@@ -18,7 +18,7 @@ const bot = new TelegramBot(
 );
 
 function arrayToMsg(arr) {
-    const msg = arr.reduce((str, item) => `${str}*${item.title}*\n${item.date}\n${item.place}\n\n`, '');
+    const msg = arr.reduce((str, item) => `${str}*${item.owner} | ${item.title}*\n${item.date}\n${item.place}\n\n`, '');
     // console.log(he.decode(msg));
     return he.decode(msg);
 }
@@ -35,22 +35,26 @@ function parser(body) {
     const list = doc.getElementsByClassName('launch');
     const launchSchedule = [];
 
-    list.forEach(node => {
+    list.filter((value, index) => index < 4).forEach(node => {
         const titleNode = node.getElementsByTagName('h5');
         if (titleNode && titleNode.length > 0) {
+            const ownerNode = node.getElementsByClassName('mdl-card__title-text');
             const infoNode = node.getElementsByClassName('mdl-card__supporting-text');
+            const linkNode = node.getElementsByClassName('mdl-card__actions');
             const infoNodeArr = String(infoNode[0] && infoNode[0].textContent).split('\n \n ');
             const date = String(infoNodeArr && infoNodeArr.length > 1 && infoNodeArr[1]);
             const place = String(infoNodeArr && infoNodeArr.length > 2 && infoNodeArr[2]);
 
             launchSchedule.push({
+                owner: String(ownerNode && ownerNode[0].textContent).trim(),
                 title: String(titleNode[0].textContent).replace(/\n /g, ''),
                 date: date.replace(/\n /g, ''),
                 place: place.replace(/\n /g, ''),
+                link: String(linkNode && linkNode[0].getElementsByTagName('a')[0].getAttribute('href'))
             })
         }
     })
-    // console.log(...launchSchedule)
+    console.log(...launchSchedule)
     return arrayToMsg(launchSchedule);
 }
 
