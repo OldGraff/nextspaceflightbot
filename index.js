@@ -54,6 +54,8 @@ function parser(body) {
     return arrayToMsg(launchSchedule);
 }
 
+bot.setMyCommands([{"command": "/launches", "description": "Show launches list"}]);
+
 // Matches "/echo [whatever]"
 bot.onText(/\/launches/,  (msg, match) => {
     // 'msg' is the received Message from Telegram
