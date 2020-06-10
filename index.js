@@ -18,12 +18,15 @@ const bot = new TelegramBot(
 );
 
 const launchSchedule = [];
+let lastRequest = 0;
 const CLASS_NAMES = {
     GRID: 'mdl-grid',
     TITLE_TEXT: 'mdl-card__title-text',
     INFO_TEXT: 'mdl-card__supporting-text',
     LINKS: 'mdl-card__actions',
 }
+const DOMAIN = 'https://nextspaceflight.com';
+const LAUNCHES_URL = `${DOMAIN}/launches/`;
 
 /**
  * Merge array to message string
@@ -32,7 +35,10 @@ const CLASS_NAMES = {
  * @returns {string} message
  */
 function arrayToMsg(arr) {
-    const msg = arr.reduce((str, item) => `${str}*${item.owner} | ${item.title}*\n${item.date}\n${item.place}\n\n`, '');
+    const msg = arr.reduce((str, item) => {
+        const streamStr = item.streamLink === '' ? '' : `${item.streamLink}\n`;
+        return `${str}*${item.owner} | ${item.title}*\n${item.date}\n${item.place}\n${DOMAIN}${item.detailsLink}\n${streamStr}\n`
+    }, '');
     // console.log(he.decode(msg));
     return he.decode(msg);
 }
@@ -84,13 +90,14 @@ function getNodeLinks(node, className= '') {
  *
  * @param body {string} string containing HTML source
  * @param index {number} element number to return
- * @returns {string} schedule text
+ * @returns {Object[]} schedule array
  */
 function parser(body, index = -1) {
     const list = parseNodeList(body, CLASS_NAMES.GRID);
     launchSchedule.length = 0;
+    lastRequest = Date.now();
 
-    list.filter((value, i) => value.parentNode && i < 5).forEach(node => {
+    list.filter((value, i) => value.parentNode && i < 6).forEach(node => {
         const titleNode = node.getElementsByTagName('h5');
 
         if (titleNode && titleNode.length > 0) {
@@ -104,14 +111,24 @@ function parser(body, index = -1) {
                 title: getNodeText(titleNode).replace(/\n /g, ''),
                 date: String(infoArr[1]).replace(/\n /g, ''),
                 place: String(infoArr[2]).replace(/\n /g, ''),
-                launchLink: linksArr[0],
-                translationLink: linksArr[1],
+                detailsLink: linksArr[0],
+                streamLink: linksArr[1] || '',
                 img: imgSrc,
             })
         }
     })
     // console.log(...launchSchedule)
-    return arrayToMsg(index > -1 ? [launchSchedule[index]] : launchSchedule);
+    return launchSchedule;
+}
+
+/**
+ * Check if time has passed from last request
+ *
+ * @param time {number} minutes
+ * @returns {boolean} true if time passed
+ */
+function isTimeHasPassed(time) {
+    return time*60*1000 < Date.now() - lastRequest;
 }
 
 bot.setMyCommands([
@@ -130,27 +147,37 @@ bot.onText(/\/launches/,  (msg, match) => {
     // of the message
 
     const chatId = msg.chat.id;
+    const options = {"parse_mode": "Markdown", "disable_web_page_preview": true};
     // const resp = match[1]; // the captured "whatever"
-
-    const URL = 'https://nextspaceflight.com/launches/';
-
-    fetch(URL)
-        .then(res => res.text())
-        .then(body => bot.sendMessage(chatId, parser(body), {"parse_mode": "Markdown"}));
+    if (isTimeHasPassed(15) || launchSchedule.length === 0) {
+        fetch(LAUNCHES_URL)
+            .then(res => res.text())
+            .then(body => {
+                const arr = parser(body);
+                return bot.sendMessage(chatId, arrayToMsg(arr), options)
+            });
+    } else {
+        bot.sendMessage(chatId, arrayToMsg(launchSchedule), options)
+    }
 });
 
 bot.onText(/\/nextlaunch/,  (msg, match) => {
 
     const chatId = msg.chat.id;
+    const options = {"parse_mode": "Markdown", "caption": ''};
 
-    const URL = 'https://nextspaceflight.com/launches/';
-
-    fetch(URL)
-        .then(res => res.text())
-        .then(body => {
-            const caption = parser(body, 0);
-            return bot.sendPhoto(chatId, launchSchedule[0].img,{"parse_mode": "Markdown", "caption": caption})
-        });
+    if (isTimeHasPassed(15) || launchSchedule.length === 0) {
+        fetch(LAUNCHES_URL)
+            .then(res => res.text())
+            .then(body => {
+                const arr = parser(body);
+                options.caption = arrayToMsg([arr[0]]);
+                return bot.sendPhoto(chatId, arr[0].img, options)
+            });
+    } else {
+        options.caption = arrayToMsg([launchSchedule[0]]);
+        bot.sendPhoto(chatId, launchSchedule[0].img, options)
+    }
 });
 
 // Listen for any kind of message. There are different kinds of
