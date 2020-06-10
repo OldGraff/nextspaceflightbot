@@ -18,6 +18,12 @@ const bot = new TelegramBot(
 );
 
 const launchSchedule = [];
+const CLASS_NAMES = {
+    GRID: 'mdl-grid',
+    TITLE_TEXT: 'mdl-card__title-text',
+    INFO_TEXT: 'mdl-card__supporting-text',
+    LINKS: 'mdl-card__actions',
+}
 
 /**
  * Merge array to message string
@@ -32,6 +38,48 @@ function arrayToMsg(arr) {
 }
 
 /**
+ * Parse HTML source and return nodes array
+ *
+ * @param body {string} string containing HTML source
+ * @param className {string} nodes class name to collect
+ * @returns {Object[]} nodes array
+ */
+function parseNodeList(body, className) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(body, "text/html");
+    const list = doc.getElementsByClassName(className);
+
+    return list || [];
+}
+
+/**
+ * Get text from target node
+ *
+ * @param node {Object} parent node
+ * @param className {string} [className=''] target node class name
+ * @returns {string} text content
+ */
+function getNodeText(node, className= '') {
+    const childNodes = className === '' ? node : node.getElementsByClassName(className);
+
+    return String(childNodes && childNodes[0] && childNodes[0].textContent);
+}
+
+/**
+ * Get links from target node
+ *
+ * @param node {Object} parent node
+ * @param className {string} [className=''] target node class name
+ * @returns {Object[]} links array
+ */
+function getNodeLinks(node, className= '') {
+    const childNodes = className === '' ? node : node.getElementsByClassName(className);
+    const linksNodes = childNodes && childNodes[0] && childNodes[0].getElementsByTagName('a');
+
+    return linksNodes.map(el => String(el.getAttribute('href')));
+}
+
+/**
  * Parse HTML source and return schedule array
  *
  * @param body {string} string containing HTML source
@@ -39,32 +87,25 @@ function arrayToMsg(arr) {
  * @returns {string} schedule text
  */
 function parser(body, index = -1) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(body, "text/html");
-    const list = doc.getElementsByClassName('mdl-grid');
+    const list = parseNodeList(body, CLASS_NAMES.GRID);
     launchSchedule.length = 0;
 
     list.filter((value, i) => value.parentNode && i < 5).forEach(node => {
         const titleNode = node.getElementsByTagName('h5');
 
         if (titleNode && titleNode.length > 0) {
-            const ownerNode = node.getElementsByClassName('mdl-card__title-text');
-            const infoNode = node.getElementsByClassName('mdl-card__supporting-text');
-            const linkNode = node.getElementsByClassName('mdl-card__actions');
-            const imgStyleNode = node.getElementsByTagName('style');
-            const imgStyleStr = String(imgStyleNode && imgStyleNode[0].textContent);
+            const linksArr = getNodeLinks(node, CLASS_NAMES.LINKS);
+            const imgStyleStr = getNodeText(node.getElementsByTagName('style'));
             const imgSrc = imgStyleStr.slice(imgStyleStr.indexOf('https://storage'), imgStyleStr.indexOf(') '));
-
-            const infoNodeArr = String(infoNode[0] && infoNode[0].textContent).split('\n \n ');
-            const date = String(infoNodeArr && infoNodeArr.length > 1 && infoNodeArr[1]);
-            const place = String(infoNodeArr && infoNodeArr.length > 2 && infoNodeArr[2]);
-            // console.log(imgSrc);
+            const infoArr = getNodeText(node, CLASS_NAMES.INFO_TEXT).split('\n \n ');
+            // console.log(imgSrc, linksArr);
             launchSchedule.push({
-                owner: String(ownerNode && ownerNode[0].textContent).trim(),
-                title: String(titleNode[0].textContent).replace(/\n /g, ''),
-                date: date.replace(/\n /g, ''),
-                place: place.replace(/\n /g, ''),
-                link: String(linkNode && linkNode[0].getElementsByTagName('a')[0].getAttribute('href')),
+                owner: getNodeText(node, CLASS_NAMES.TITLE_TEXT).trim(),
+                title: getNodeText(titleNode).replace(/\n /g, ''),
+                date: String(infoArr[1]).replace(/\n /g, ''),
+                place: String(infoArr[2]).replace(/\n /g, ''),
+                launchLink: linksArr[0],
+                translationLink: linksArr[1],
                 img: imgSrc,
             })
         }
